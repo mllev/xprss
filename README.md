@@ -6,7 +6,7 @@
 const http = require('http')
 const app = require('xprss')()
 
-app.get('/', function (req, res) {
+app.get('/:name', function (req, res) {
   res.html('<p>Hello, ' + req.params.name + '</p>')
 })
 
