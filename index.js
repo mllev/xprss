@@ -1,8 +1,9 @@
 const url = require('url')
 const querystring = require('querystring')
 const fs = require('fs')
+const qs = require('querystring')
 const path = require('path')
-const formidable = require('formidable')
+const { formidable } = require('formidable')
 const mimedb = require('./mime.json')
 
 const mimeTypes = {};
@@ -74,7 +75,7 @@ function app (req, res) {
     req.url = req.url.split('?')[0]
   }
 
-  parseBody(req, function () {
+  parseBody(req, 1e9, function () {
     next()
   })
 }
@@ -148,46 +149,44 @@ function _handle (method, defaultRoute) {
   }
 }
 
-function parseBody (req, cb) {
-  let body = {}
-  let files = []
-  let form = new formidable.IncomingForm()
-  
-  form.onPart = part => {
-    let buf = []
-
-    if (!part.filename) {
-      return form.handlePart(part)
-    }
-
-    let name = part.filename
-    let mime = part.mime
-
-    part.on('data', data => {
-      buf.push(data)
+function parseBody (req, max, cb) {
+  let buf = '';
+  if (req.method === 'POST'
+    && req.headers['content-type']
+    && req.headers['content-type'].startsWith('multipart/form-data')) {
+    const form = formidable({});
+    form.parse(req).then(([fields, files]) => {
+      req.files = files
+      cb()
+    }).catch((e) => {
+      cb(e)
     })
-    
-    part.on('end', () => {
-      buf = Buffer.concat(buf)
-      files.push({
-        name: name,
-        mime: mime,
-        data: buf
-      })
-    })
+    return
   }
-
-  form.on('field', (key, value) => {
-    body[key] = value
+  req.on('data', (chunk) => {
+    if (buf.length > max) {
+      cb('Maximum body size exceeeded');
+    } else {
+      buf += chunk;
+    }
+  });
+  req.on('end', () => {
+    let data;
+    try {
+      data = JSON.parse(buf);
+    } catch (e) {
+      try {
+	data = qs.parse(buf);
+      } catch (e) {
+	cb('Invalid request body format');
+      }
+    }
+    req.body = data;
+    cb();
   })
-
-  form.on('end', () => {
-    req.body = body
-    req.files = files
-    cb()
-  })
-
-  form.parse(req)
+  req.on('error', (e) => {
+    cb(e);
+  });
 }
 
 function serveStaticFile (p, res) {
@@ -218,7 +217,7 @@ app.delete = _handle('delete')
 app.use = _handle('*', '*')
 
 module.exports = function (config) {
-  if (config.publicDir) {
+  if (config && config.publicDir) {
     app.publicDir = config.publicDir
   }
   return app
