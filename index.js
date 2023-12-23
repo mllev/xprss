@@ -28,7 +28,6 @@ function app (req, res) {
   if (method === 'get' && app.publicDir) {
     const p = url.parse(req.url).pathname;
     const f = path.resolve(process.cwd(), app.publicDir, p.slice(1));
-console.log('!!!!', f)
     const ext = path.extname(f);
     if (ext && serveStaticFile(f, res)) return;
   }
