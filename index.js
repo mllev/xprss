@@ -196,34 +196,18 @@ function serveStaticFile (p, res) {
     return false;
   ext = ext.slice(1);
   try {
-    const data = fs.readFileSync(p);
-    const mime = mimeTypes[ext] || 'text/plain';
-    res.writeHead(200, { 'Content-type': `${mime}` });
-    res.end(data);
+    if (fs.existsSync(p)) {
+      const data = fs.readFileSync(p);
+      const mime = mimeTypes[ext] || 'text/plain';
+      res.writeHead(200, { 'Content-type': `${mime}` });
+      res.end(data);
+    } else {
+      res.statusCode = 404
+      res.end('not found');
+    }
     return true;
   } catch (e) {
-    console.log('XPRSS error', e)
-    return false;
-  }
-}
-
-function _static (dir) {
-  return function (req, res) {
-    const file = req.url
-    const parts = file.split('.')
-    const ext = parts[parts.length - 1]
-    const fullpath = path
-
-    fs.readFile(path.join(dir, + file), function (err, data) {
-      if (!err && data) {
-        res.statusCode = 200
-        res.setHeader('Content-Type', mimeTypes[ext] || 'text/plain')
-        res.end(data)
-      } else {
-        console.log(err)
-        res.html(404, '<h3>Not found.</h3>')
-      }
-    })
+    throw new Error('Static file server error', e)
   }
 }
 
