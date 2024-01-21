@@ -3,7 +3,6 @@ const querystring = require('querystring')
 const fs = require('fs')
 const qs = require('querystring')
 const path = require('path')
-const { formidable } = require('formidable')
 const mimedb = require('./mime.json')
 
 const mimeTypes = {};
@@ -58,7 +57,7 @@ function app (req, res) {
         handlers[i].method === '*' ||
         (app.matchRoute(req, handlers[i].route) && method === handlers[i].method)
       ) {
-	found = true
+	      found = true
         handlers[i++].handler(req, res, next)
         break
       }
@@ -75,7 +74,8 @@ function app (req, res) {
     req.url = req.url.split('?')[0]
   }
 
-  parseBody(req, 1e9, function () {
+  parseBody(req, 1e9, function (e) {
+    if (e) throw new Error(e);
     next()
   })
 }
@@ -154,14 +154,7 @@ function parseBody (req, max, cb) {
   if (req.method === 'POST'
     && req.headers['content-type']
     && req.headers['content-type'].startsWith('multipart/form-data')) {
-    const form = formidable({});
-    form.parse(req).then(([fields, files]) => {
-      req.files = files
-      cb()
-    }).catch((e) => {
-      cb(e)
-    })
-    return
+    return cb();
   }
   req.on('data', (chunk) => {
     if (buf.length > max) {
@@ -176,16 +169,16 @@ function parseBody (req, max, cb) {
       data = JSON.parse(buf);
     } catch (e) {
       try {
-	data = qs.parse(buf);
+      	data = qs.parse(buf);
       } catch (e) {
-	cb('Invalid request body format');
+	      cb('Invalid request body format');
       }
     }
     req.body = data;
     cb();
   })
   req.on('error', (e) => {
-    cb(e);
+    cb(e.message);
   });
 }
 
@@ -201,8 +194,7 @@ function serveStaticFile (p, res) {
       res.writeHead(200, { 'Content-type': `${mime}` });
       res.end(data);
     } else {
-      res.statusCode = 404
-      res.end('not found');
+      return false;
     }
     return true;
   } catch (e) {
